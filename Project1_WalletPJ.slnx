@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Project1_WalletPJ/Project1_WalletPJ.csproj" />
+  <Project Path="WalletPj.UI/WalletPj.UI.csproj" Id="b55d1748-62fd-4143-b2ab-baabdf799d33" />
+</Solution>

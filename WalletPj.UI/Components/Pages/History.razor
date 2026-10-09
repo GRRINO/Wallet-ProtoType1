@@ -1,0 +1,86 @@
+﻿@page "/history"
+@inject AppState State
+@inject WalletApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>History</PageTitle>
+<PageHeader Title="Transaction history" />
+
+<div class="card">
+    <div class="filters">
+        <div><label>From</label><input type="date" @bind="_from" /></div>
+        <div><label>To</label><input type="date" @bind="_to" /></div>
+    </div>
+    <div class="row gap">
+        <button class="btn primary sm" @onclick="ApplyAsync">Apply</button>
+        <button class="btn ghost sm" @onclick="ClearAsync">Clear</button>
+    </div>
+</div>
+
+<div class="card">
+    @if (_error != null) { <div class="alert err">@_error</div> }
+
+    @if (_loading && _items.Count == 0)
+    {
+        <div class="center muted pad">Loading…</div>
+    }
+    else if (_items.Count == 0)
+    {
+        <div class="center muted pad">No transactions found.</div>
+    }
+    else
+    {
+        @foreach (var t in _items) { <TxRow Tx="t" /> }
+        @if (_hasMore)
+        {
+            <button class="btn ghost" disabled="@_loading" @onclick="LoadMoreAsync">@(_loading ? "Loading…" : "Load more")</button>
+        }
+    }
+</div>
+
+@code {
+    private const int PageSize = 15;
+    private DateTime? _from, _to;
+    private List<TxItem> _items = new();
+    private int _page = 1;
+    private bool _loading, _hasMore;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await State.EnsureLoadedAsync();
+        if (!State.IsLoggedIn) { Nav.NavigateTo(""); return; }
+        await ApplyAsync();
+    }
+
+    private async Task ApplyAsync()
+    {
+        _page = 1; _items.Clear();
+        await FetchAsync();
+    }
+
+    private async Task ClearAsync()
+    {
+        _from = _to = null;
+        await ApplyAsync();
+    }
+
+    private async Task LoadMoreAsync()
+    {
+        _page++;
+        await FetchAsync();
+    }
+
+    private async Task FetchAsync()
+    {
+        _loading = true; _error = null;
+        try
+        {
+            var p = await Api.GetStatementAsync(State.Mobile!, _from, _to, _page, PageSize);
+            _items.AddRange(p.Items);
+            _hasMore = p.HasMore;
+        }
+        catch (ApiException ex) { _error = ex.Message; }
+        finally { _loading = false; }
+    }
+}

@@ -1,0 +1,37 @@
+﻿@inherits LayoutComponentBase
+@implements IDisposable
+@inject AppState State
+
+<div class="app">
+    <header class="topbar">
+        <span class="logo">💳 MyWallet</span>
+        @if (State.IsLoggedIn)
+        {
+            <span class="who">@State.Mobile</span>
+        }
+    </header>
+
+    <main class="content">@Body</main>
+
+    @if (State.IsLoggedIn)
+    {
+        <nav class="bottom-nav">
+            <NavLink href="" Match="NavLinkMatch.All"><span>🏠</span>Home</NavLink>
+            <NavLink href="deposit"><span>➕</span>Deposit</NavLink>
+            <NavLink href="transfer"><span>📤</span>Send</NavLink>
+            <NavLink href="history"><span>🧾</span>History</NavLink>
+            <NavLink href="settings"><span>⚙️</span>More</NavLink>
+        </nav>
+    }
+</div>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        State.Changed += OnChanged;
+        await State.EnsureLoadedAsync();
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+    public void Dispose() => State.Changed -= OnChanged;
+}

@@ -1,0 +1,53 @@
+﻿@page "/deposit"
+@inject AppState State
+@inject WalletApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>Deposit</PageTitle>
+<PageHeader Title="Deposit" />
+
+<div class="card">
+    @if (_error != null) { <div class="alert err">@_error</div> }
+    @if (_ok != null) { <div class="alert ok">@_ok</div> }
+
+    <label>Amount</label>
+    <input type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" @bind="_amount" />
+    <div class="chips">
+        @foreach (var v in new[] { 10, 50, 100, 500 })
+        {
+            <button type="button" @onclick="() => _amount = v">+@v</button>
+        }
+    </div>
+
+    <label>Note (optional)</label>
+    <input placeholder="e.g. Salary" @bind="_note" />
+
+    <button class="btn primary" disabled="@_busy" @onclick="SubmitAsync">@(_busy ? "Please wait…" : "Deposit")</button>
+</div>
+
+@code {
+    private decimal _amount;
+    private string? _note, _error, _ok;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await State.EnsureLoadedAsync();
+        if (!State.IsLoggedIn) Nav.NavigateTo("");
+    }
+
+    private async Task SubmitAsync()
+    {
+        _error = _ok = null;
+        if (_amount <= 0) { _error = "Enter an amount greater than 0."; return; }
+        _busy = true;
+        try
+        {
+            await Api.DepositAsync(State.Mobile!, _amount, _note);
+            _ok = $"Deposited {Fmt.Money(_amount)} successfully.";
+            _amount = 0; _note = null;
+        }
+        catch (ApiException ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

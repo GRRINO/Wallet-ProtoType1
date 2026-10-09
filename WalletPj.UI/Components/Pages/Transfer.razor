@@ -1,0 +1,57 @@
+﻿@page "/transfer"
+@inject AppState State
+@inject WalletApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>Transfer</PageTitle>
+<PageHeader Title="Send money" />
+
+<div class="card">
+    @if (_error != null) { <div class="alert err">@_error</div> }
+    @if (_ok != null) { <div class="alert ok">@_ok</div> }
+
+    <label>Recipient mobile number</label>
+    <input type="tel" inputmode="tel" placeholder="Receiver's wallet number" @bind="_to" />
+
+    <label>Amount</label>
+    <input type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" @bind="_amount" />
+
+    <label>PIN</label>
+    <input type="password" inputmode="numeric" maxlength="6" @bind="_pin" />
+
+    <label>Note (optional)</label>
+    <input @bind="_note" />
+
+    <button class="btn primary" disabled="@_busy" @onclick="SubmitAsync">@(_busy ? "Sending…" : "Send")</button>
+</div>
+
+@code {
+    private string _to = "", _pin = "";
+    private decimal _amount;
+    private string? _note, _error, _ok;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await State.EnsureLoadedAsync();
+        if (!State.IsLoggedIn) Nav.NavigateTo("");
+    }
+
+    private async Task SubmitAsync()
+    {
+        _error = _ok = null;
+        if (string.IsNullOrWhiteSpace(_to)) { _error = "Enter the recipient's number."; return; }
+        if (_to.Trim() == State.Mobile) { _error = "You can't send money to yourself."; return; }
+        if (_amount <= 0) { _error = "Enter an amount greater than 0."; return; }
+        if (string.IsNullOrWhiteSpace(_pin)) { _error = "PIN is required."; return; }
+        _busy = true;
+        try
+        {
+            await Api.TransferAsync(State.Mobile!, _to.Trim(), _amount, _pin, _note);
+            _ok = $"Sent {Fmt.Money(_amount)} to {_to.Trim()}.";
+            _to = _pin = ""; _amount = 0; _note = null;
+        }
+        catch (ApiException ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

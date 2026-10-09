@@ -1,0 +1,52 @@
+﻿@page "/withdraw"
+@inject AppState State
+@inject WalletApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>Withdraw</PageTitle>
+<PageHeader Title="Withdraw" />
+
+<div class="card">
+    @if (_error != null) { <div class="alert err">@_error</div> }
+    @if (_ok != null) { <div class="alert ok">@_ok</div> }
+
+    <label>Amount</label>
+    <input type="number" inputmode="decimal" step="0.01" min="0" placeholder="0.00" @bind="_amount" />
+
+    <label>PIN</label>
+    <input type="password" inputmode="numeric" maxlength="6" @bind="_pin" />
+
+    <label>Note (optional)</label>
+    <input @bind="_note" />
+
+    <button class="btn danger" disabled="@_busy" @onclick="SubmitAsync">@(_busy ? "Please wait…" : "Withdraw")</button>
+</div>
+
+@code {
+    private decimal _amount;
+    private string _pin = "";
+    private string? _note, _error, _ok;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await State.EnsureLoadedAsync();
+        if (!State.IsLoggedIn) Nav.NavigateTo("");
+    }
+
+    private async Task SubmitAsync()
+    {
+        _error = _ok = null;
+        if (_amount <= 0) { _error = "Enter an amount greater than 0."; return; }
+        if (string.IsNullOrWhiteSpace(_pin)) { _error = "PIN is required."; return; }
+        _busy = true;
+        try
+        {
+            await Api.WithdrawAsync(State.Mobile!, _amount, _pin, _note);
+            _ok = $"Withdrew {Fmt.Money(_amount)} successfully.";
+            _amount = 0; _pin = ""; _note = null;
+        }
+        catch (ApiException ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

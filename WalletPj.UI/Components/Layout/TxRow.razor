@@ -1,0 +1,19 @@
+﻿<div class="tx">
+    <div class="tx-icon @(Tx.IsCredit ? "in" : "out")">@(Tx.IsCredit ? "↓" : "↑")</div>
+    <div class="tx-info">
+        <div class="tx-title">@(string.IsNullOrWhiteSpace(Tx.Type) ? (Tx.IsCredit ? "Credit" : "Debit") : Tx.Type)</div>
+        <div class="muted small">
+            @if (!string.IsNullOrWhiteSpace(Tx.Counterparty)) { <span>@Tx.Counterparty · </span> }
+            @(Tx.Date?.ToString("dd MMM yyyy, HH:mm") ?? "")
+        </div>
+        @if (!string.IsNullOrWhiteSpace(Tx.Note)) { <div class="muted small">“@Tx.Note”</div> }
+    </div>
+    <div class="tx-amt @(Tx.IsCredit ? "in" : "out")">
+        @(Tx.IsCredit ? "+" : "−")@Fmt.Money(Tx.Amount)
+        @if (Tx.BalanceAfter is { } b) { <div class="muted small">Bal @Fmt.Money(b)</div> }
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public TxItem Tx { get; set; } = default!;
+}

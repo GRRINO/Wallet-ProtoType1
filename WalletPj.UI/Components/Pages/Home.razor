@@ -1,0 +1,134 @@
+﻿@page "/"
+@inject AppState State
+@inject WalletApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>MyWallet</PageTitle>
+
+@if (!_ready)
+{
+    <div class="center muted pad">Loading…</div>
+}
+else if (!State.IsLoggedIn)
+{
+    <div class="card">
+        <div class="tabs">
+            <button class="@(_mode == "login" ? "on" : "")" @onclick='() => { _mode = "login"; _error = null; }'>Sign in</button>
+            <button class="@(_mode == "register" ? "on" : "")" @onclick='() => { _mode = "register"; _error = null; }'>New wallet</button>
+        </div>
+
+        @if (_error != null) { <div class="alert err">@_error</div> }
+
+        <label>Mobile number</label>
+        <input type="tel" inputmode="tel" placeholder="e.g. 09123456789" @bind="_mobile" />
+
+        @if (_mode == "register")
+        {
+            <label>Full name</label>
+            <input placeholder="Your name" @bind="_name" />
+            <label>PIN</label>
+            <input type="password" inputmode="numeric" maxlength="6" placeholder="4-6 digits" @bind="_pin" />
+            <button class="btn primary" disabled="@_busy" @onclick="RegisterAsync">Create wallet</button>
+        }
+        else
+        {
+            <button class="btn primary" disabled="@_busy" @onclick="LoginAsync">Open wallet</button>
+        }
+    </div>
+}
+else
+{
+    @if (_error != null) { <div class="alert err">@_error</div> }
+
+    <section class="balance-card">
+        <div class="row between">
+            <span>@(_wallet?.Name ?? "My wallet")</span>
+            <span class="badge @(_wallet?.IsActive == false ? "off" : "on")">@(_wallet?.IsActive == false ? "Inactive" : "Active")</span>
+        </div>
+        <div class="muted-w small">Current balance</div>
+        <div class="balance">
+            @(_hide ? "••••••" : Fmt.Money(_wallet?.Balance ?? 0))
+            <button class="eye" @onclick="() => _hide = !_hide" aria-label="Toggle balance">@(_hide ? "👁️" : "🙈")</button>
+        </div>
+        <div class="small muted-w">@State.Mobile</div>
+    </section>
+
+    <section class="actions">
+        <a href="deposit"><span>➕</span>Deposit</a>
+        <a href="withdraw"><span>💸</span>Withdraw</a>
+        <a href="transfer"><span>📤</span>Transfer</a>
+        <a href="history"><span>🧾</span>History</a>
+    </section>
+
+    <section class="card">
+        <div class="row between">
+            <h2>Recent activity</h2>
+            <a href="history" class="link">See all</a>
+        </div>
+        @if (_recent.Count == 0)
+        {
+            <div class="muted center pad">No transactions yet.</div>
+        }
+        else
+        {
+            @foreach (var t in _recent) { <TxRow Tx="t" /> }
+        }
+    </section>
+}
+
+@code {
+    private bool _ready, _busy, _hide;
+    private string _mode = "login";
+    private string _mobile = "", _name = "", _pin = "";
+    private string? _error;
+    private WalletInfo? _wallet;
+    private List<TxItem> _recent = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await State.EnsureLoadedAsync();
+        await LoadAsync();
+        _ready = true;
+    }
+
+    private async Task LoadAsync()
+    {
+        if (!State.IsLoggedIn) return;
+        try
+        {
+            _error = null;
+            _wallet = await Api.GetWalletAsync(State.Mobile!);
+            _recent = (await Api.GetStatementAsync(State.Mobile!, null, null, 1, 5)).Items;
+        }
+        catch (ApiException ex) { _error = ex.Message; }
+    }
+
+    private async Task LoginAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_mobile)) { _error = "Enter your mobile number."; return; }
+        _busy = true; _error = null;
+        try
+        {
+            await Api.GetWalletAsync(_mobile.Trim());   // verify wallet exists
+            await State.LoginAsync(_mobile);
+            await LoadAsync();
+        }
+        catch (ApiException ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    private async Task RegisterAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_mobile) || string.IsNullOrWhiteSpace(_name) || string.IsNullOrWhiteSpace(_pin))
+        { _error = "Please fill in all fields."; return; }
+        _busy = true; _error = null;
+        try
+        {
+            await Api.RegisterAsync( _name.Trim(),_mobile.Trim(), _pin);
+            await State.LoginAsync(_mobile);
+            await LoadAsync();
+        }
+        catch (ApiException ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+}

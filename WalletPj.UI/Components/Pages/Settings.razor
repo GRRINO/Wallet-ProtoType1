@@ -1,0 +1,89 @@
+﻿@page "/settings"
+@inject AppState State
+@inject WalletApiClient Api
+@inject NavigationManager Nav
+
+<PageTitle>More</PageTitle>
+<PageHeader Title="Settings" />
+
+<div class="card">
+    <h2>Account</h2>
+    <div class="kv"><span>Name</span><b>@(_wallet?.Name ?? "-")</b></div>
+    <div class="kv"><span>Mobile</span><b>@State.Mobile</b></div>
+    <div class="kv"><span>Status</span><b>@(_wallet?.IsActive == false ? "Inactive" : "Active")</b></div>
+
+    @if (_wallet?.IsActive == false)
+    {
+        <button class="btn primary" disabled="@_busy" @onclick="() => SetActiveAsync(true)">Activate wallet</button>
+    }
+    else
+    {
+        <button class="btn ghost" disabled="@_busy" @onclick="() => SetActiveAsync(false)">Deactivate wallet</button>
+    }
+</div>
+
+<div class="card">
+    <h2>Change PIN</h2>
+    @if (_error != null) { <div class="alert err">@_error</div> }
+    @if (_ok != null) { <div class="alert ok">@_ok</div> }
+
+    <label>Current PIN</label>
+    <input type="password" inputmode="numeric" maxlength="6" @bind="_old" />
+    <label>New PIN</label>
+    <input type="password" inputmode="numeric" maxlength="6" @bind="_new" />
+    <label>Confirm new PIN</label>
+    <input type="password" inputmode="numeric" maxlength="6" @bind="_confirm" />
+    <button class="btn primary" disabled="@_busy" @onclick="ChangePinAsync">Update PIN</button>
+</div>
+
+<button class="btn danger outline" @onclick="LogoutAsync">Log out</button>
+
+@code {
+    private WalletInfo? _wallet;
+    private string _old = "", _new = "", _confirm = "";
+    private string? _error, _ok;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await State.EnsureLoadedAsync();
+        if (!State.IsLoggedIn) { Nav.NavigateTo(""); return; }
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try { _wallet = await Api.GetWalletAsync(State.Mobile!); }
+        catch (ApiException ex) { _error = ex.Message; }
+    }
+
+    private async Task ChangePinAsync()
+    {
+        _error = _ok = null;
+        if (string.IsNullOrWhiteSpace(_old) || string.IsNullOrWhiteSpace(_new)) { _error = "Fill in all fields."; return; }
+        if (_new != _confirm) { _error = "New PIN and confirmation do not match."; return; }
+        _busy = true;
+        try
+        {
+            await Api.ChangePinAsync(State.Mobile!, _old, _new);
+            _ok = "PIN updated.";
+            _old = _new = _confirm = "";
+        }
+        catch (ApiException ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    private async Task SetActiveAsync(bool active)
+    {
+        _busy = true; _error = _ok = null;
+        try { await Api.SetActiveAsync(State.Mobile!, active); await LoadAsync(); }
+        catch (ApiException ex) { _error = ex.Message; }
+        finally { _busy = false; }
+    }
+
+    private async Task LogoutAsync()
+    {
+        await State.LogoutAsync();
+        Nav.NavigateTo("");
+    }
+}
